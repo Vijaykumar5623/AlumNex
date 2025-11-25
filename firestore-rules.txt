@@ -1,0 +1,82 @@
+// Firestore Security Rules for Alumni Management Platform
+// 
+// Copy this entire file content and paste it into your Firebase Console:
+// 1. Go to Firebase Console → Your Project
+// 2. Click on "Firestore Database" in the left sidebar
+// 3. Click on the "Rules" tab at the top
+// 4. Replace the existing rules with the content below
+// 5. Click "Publish"
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Allow public read access to docs, restrict writes
+    match /docs/{document=**} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // Profiles: each user can read/write their own profile, admins can read all
+    match /profiles/{uid} {
+      allow read: if request.auth.uid == uid || isAdmin();
+      allow create: if request.auth.uid == uid;
+      allow update: if request.auth.uid == uid || isAdmin();
+      allow delete: if false;
+    }
+
+    // Jobs: alumni can create, students can read, admin can moderate
+    match /jobs/{jobId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && hasRole('alumni');
+      allow update: if isOwner(resource.data.createdBy) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Events: similar to jobs
+    match /events/{eventId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && hasRole('alumni');
+      allow update: if isOwner(resource.data.createdBy) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Mentorship requests: can create, own user + alumni can read/modify
+    match /mentorship_requests/{requestId} {
+      allow read: if isOwner(resource.data.studentUid) || isOwner(resource.data.mentorUid) || isAdmin();
+      allow create: if request.auth != null && hasRole('student');
+      allow update: if isOwner(resource.data.studentUid) || isOwner(resource.data.mentorUid) || isAdmin();
+    }
+
+    // Messages: participants can read/write
+    match /conversations/{conversationId} {
+      allow read, write: if request.auth.uid in resource.data.participants || isAdmin();
+      
+      match /messages/{messageId} {
+        allow read, write: if get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants.hasAny([request.auth.uid]) || isAdmin();
+      }
+    }
+
+    // Analytics logs: only admin can write
+    match /analytics/{docId=**} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Helper functions
+    function isAdmin() {
+      return request.auth != null && 
+             get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+
+    function hasRole(role) {
+      return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == role;
+    }
+  }
+}
