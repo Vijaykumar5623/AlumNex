@@ -1,9 +1,9 @@
 // Firebase initialization reading config from environment variables.
 // Create a local `.env.local` with the values (see `.env.local.example`).
 import { initializeApp, getApps } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
-import { getStorage } from 'firebase/storage'
+import { getAuth, connectAuthEmulator } from 'firebase/auth'
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
+import { getStorage, connectStorageEmulator } from 'firebase/storage'
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
@@ -15,18 +15,15 @@ const firebaseConfig = {
 }
 
 let app
+let authInitialized = false
+
 if (!getApps().length) {
   if (!firebaseConfig.apiKey) {
-    // When running without config, initializeApp will fail — warn for clarity.
-    // During development, create a `.env.local` with the Firebase values.
-    // The app will still compile but Firebase operations will error until config is provided.
-    // eslint-disable-next-line no-console
     console.warn('Firebase config missing. Add your keys to .env.local following .env.local.example')
   }
   try {
     app = initializeApp(firebaseConfig)
   } catch (e) {
-    // eslint-disable-next-line no-console
     console.warn('Failed to initialize Firebase app (missing/invalid config).', e)
   }
 }

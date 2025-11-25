@@ -13,6 +13,7 @@ cd "c:\Users\vijay\OneDrive\Desktop\SIH protptype"
 npm install
 
 
+
 # 2) Add your Firebase config
 # Edit `lib/firebase.ts` and paste the config object from your Firebase console
 

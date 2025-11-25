@@ -73,9 +73,14 @@ export default function Dashboard() {
                 Complete profile & upload documents →
               </Link>
             )}
+            {profile.role === 'alumni' && profile.verified && (
+              <Link href="/profile/edit" className="text-blue-600 hover:underline text-sm">
+                Edit profile →
+              </Link>
+            )}
             {profile.role === 'admin' && (
-              <Link href="/admin/pending-verifications" className="text-blue-600 hover:underline text-sm">
-                Go to admin panel →
+              <Link href="/admin/documents" className="text-blue-600 hover:underline text-sm">
+                Review documents →
               </Link>
             )}
           </div>
@@ -112,14 +117,17 @@ export default function Dashboard() {
               )}
               {profile.role === 'admin' && (
                 <>
+                  <Link href="/admin/documents" className="block text-blue-600 hover:underline text-sm">
+                    Review Documents
+                  </Link>
                   <Link href="/admin/pending-verifications" className="block text-blue-600 hover:underline text-sm">
                     Pending Verifications
                   </Link>
+                  <Link href="/admin/mentorship-requests" className="block text-blue-600 hover:underline text-sm">
+                    Mentorship Requests
+                  </Link>
                   <Link href="/admin/analytics" className="block text-blue-600 hover:underline text-sm">
                     View Analytics
-                  </Link>
-                  <Link href="/admin/manage-content" className="block text-blue-600 hover:underline text-sm">
-                    Manage Content
                   </Link>
                 </>
               )}

@@ -42,7 +42,19 @@ export default function Signup() {
         window.location.href = '/dashboard'
       }, 1500)
     } catch (err: any) {
-      setMessage(err.message || 'Error creating account')
+      console.error('Signup error:', err)
+      let errorMsg = err.message || 'Error creating account'
+      
+      // Provide user-friendly error messages
+      if (err.code === 'auth/email-already-in-use') {
+        errorMsg = 'This email is already registered'
+      } else if (err.code === 'auth/weak-password') {
+        errorMsg = 'Password should be at least 6 characters'
+      } else if (err.code === 'auth/invalid-email') {
+        errorMsg = 'Invalid email address'
+      }
+      
+      setMessage(errorMsg)
       setLoading(false)
     }
   }
