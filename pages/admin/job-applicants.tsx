@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../lib/authContext'
 import { db } from '../../lib/firebase'
-import { collection, getDocs, query, where, getDoc, doc } from 'firebase/firestore'
+import { collection, getDocs, getDoc, doc, updateDoc, addDoc } from 'firebase/firestore'
 import Link from 'next/link'
 
 interface JobSimple {
@@ -11,17 +11,20 @@ interface JobSimple {
   applicants: string[]
 }
 
-interface ProfileSummary {
+interface ApplicantSummary {
   uid: string
   name?: string
   email?: string
+  status?: string
+  appliedAt?: string
 }
 
 export default function AdminJobApplicants() {
   const { profile, loading } = useAuth()
   const [jobs, setJobs] = useState<JobSimple[]>([])
   const [fetching, setFetching] = useState(true)
-  const [selectedJobApplicants, setSelectedJobApplicants] = useState<ProfileSummary[] | null>(null)
+  const [selectedJobApplicants, setSelectedJobApplicants] = useState<ApplicantSummary[] | null>(null)
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -44,21 +47,52 @@ export default function AdminJobApplicants() {
 
   async function showApplicants(job: JobSimple) {
     try {
-      const profiles: ProfileSummary[] = []
-      for (const uid of job.applicants || []) {
-        const pSnap = await getDoc(doc(db, 'profiles', uid))
-        profiles.push({ uid, ...(pSnap.data() as any) })
+      const appsSnap = await getDocs(collection(db, 'jobs', job.id, 'applications'))
+      const result: ApplicantSummary[] = []
+      for (const a of appsSnap.docs) {
+        const ad = a.data() as any
+        const pSnap = await getDoc(doc(db, 'profiles', ad.uid))
+        result.push({ uid: ad.uid, ...(pSnap.data() as any), status: ad.status, appliedAt: ad.appliedAt })
       }
-      setSelectedJobApplicants(profiles)
+      setSelectedJobApplicants(result)
+      setSelectedJobId(job.id)
     } catch (err: any) {
       setError(err.message || 'Error loading applicants')
     }
   }
 
-  function exportCsv(profiles: ProfileSummary[] | null) {
+  async function setApplicantStatus(jobId: string, uid: string, status: string) {
+    try {
+      const appRef = doc(db, 'jobs', jobId, 'applications', uid)
+      await updateDoc(appRef, { status })
+      // update UI list if open
+      setSelectedJobApplicants((prev) => prev?.map((p) => (p.uid === uid ? { ...p, status } : p)) || null)
+
+      // create notification
+      await addNotification(uid, `Your application status changed to ${status}`)
+    } catch (err: any) {
+      setError(err.message || 'Error updating status')
+    }
+  }
+
+  async function addNotification(uid: string, message: string) {
+    try {
+      await addDoc(collection(db, 'notifications'), {
+        userId: uid,
+        type: 'application_status',
+        message,
+        createdAt: new Date().toISOString(),
+        read: false,
+      })
+    } catch (err) {
+      console.warn('Failed to create notification', err)
+    }
+  }
+
+  function exportCsv(profiles: ApplicantSummary[] | null) {
     if (!profiles) return
-    const rows = profiles.map((p) => `${p.uid},"${p.name || ''}","${p.email || ''}"`)
-    const csv = 'uid,name,email\n' + rows.join('\n')
+    const rows = profiles.map((p) => `${p.uid},"${p.name || ''}","${p.email || ''}","${p.status || ''}"`)
+    const csv = 'uid,name,email,status\n' + rows.join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -116,8 +150,32 @@ export default function AdminJobApplicants() {
                   <div>
                     <div className="font-medium">{p.name || '—'}</div>
                     <div className="text-xs text-gray-600">{p.email}</div>
+                    <div className="text-xs text-gray-500">Applied: {p.appliedAt ? new Date(p.appliedAt).toLocaleString() : '—'}</div>
                   </div>
-                  <Link href={`/profile/${p.uid}`} className="text-blue-600 hover:underline text-sm">View Profile</Link>
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm px-2 py-1 rounded bg-gray-100">{p.status || 'applied'}</div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => selectedJobId && setApplicantStatus(selectedJobId, p.uid, 'shortlisted')}
+                        className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-sm"
+                      >
+                        Shortlist
+                      </button>
+                      <button
+                        onClick={() => selectedJobId && setApplicantStatus(selectedJobId, p.uid, 'accepted')}
+                        className="px-2 py-1 bg-green-100 text-green-800 rounded text-sm"
+                      >
+                        Accept
+                      </button>
+                      <button
+                        onClick={() => selectedJobId && setApplicantStatus(selectedJobId, p.uid, 'rejected')}
+                        className="px-2 py-1 bg-red-100 text-red-800 rounded text-sm"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                    <Link href={`/profile/${p.uid}`} className="text-blue-600 hover:underline text-sm">View Profile</Link>
+                  </div>
                 </div>
               ))}
             </div>

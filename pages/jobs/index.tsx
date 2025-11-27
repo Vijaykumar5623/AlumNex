@@ -1,7 +1,19 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../lib/authContext'
 import { db } from '../../lib/firebase'
-import { collection, getDocs, query, where, updateDoc, doc, getDoc, arrayUnion, arrayRemove } from 'firebase/firestore'
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  updateDoc,
+  doc,
+  getDoc,
+  arrayUnion,
+  arrayRemove,
+  setDoc,
+  deleteDoc,
+} from 'firebase/firestore'
 import Link from 'next/link'
 
 interface Job {
@@ -17,6 +29,8 @@ interface Job {
   createdBy: string
   createdByName?: string
   applicants: string[]
+  applied?: boolean
+  applicationStatus?: string
 }
 
 export default function BrowseJobs() {
@@ -53,7 +67,25 @@ export default function BrowseJobs() {
           createdBy: data.createdBy,
           createdByName: creatorData?.name || 'Alumni',
           applicants: data.applicants || [],
+          applied: false,
+          applicationStatus: undefined,
         })
+      }
+
+      // If signed in, check per-job whether current user has an application
+      if (user) {
+        for (const j of jobsList) {
+          try {
+            const appDoc = await getDoc(doc(db, 'jobs', j.id, 'applications', user.uid))
+            if (appDoc.exists()) {
+              const appData = appDoc.data() as any
+              j.applied = true
+              j.applicationStatus = appData.status || 'applied'
+            }
+          } catch (e) {
+            // ignore per-job check errors
+          }
+        }
       }
 
       setJobs(jobsList)
@@ -70,13 +102,19 @@ export default function BrowseJobs() {
       return
     }
     try {
-      const jobRef = doc(db, 'jobs', jobId)
-      // Atomic add to applicants
-      await updateDoc(jobRef, {
-        applicants: arrayUnion(user.uid),
+      const appRef = doc(db, 'jobs', jobId, 'applications', user.uid)
+      await setDoc(appRef, {
+        uid: user.uid,
+        status: 'applied',
+        appliedAt: new Date().toISOString(),
       })
+
+      // Keep applicants array updated for quick counts (optional)
+      const jobRef = doc(db, 'jobs', jobId)
+      await updateDoc(jobRef, { applicants: arrayUnion(user.uid) })
+
       setMessage('Applied successfully!')
-      setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, applicants: [...j.applicants, user.uid] } : j)))
+      setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, applicants: [...j.applicants, user.uid], applied: true, applicationStatus: 'applied' } : j)))
     } catch (err: any) {
       setMessage(err.message || 'Error applying for job')
     }
@@ -89,12 +127,14 @@ export default function BrowseJobs() {
     }
 
     try {
+      const appRef = doc(db, 'jobs', jobId, 'applications', user.uid)
+      await deleteDoc(appRef)
+
       const jobRef = doc(db, 'jobs', jobId)
-      await updateDoc(jobRef, {
-        applicants: arrayRemove(user.uid),
-      })
+      await updateDoc(jobRef, { applicants: arrayRemove(user.uid) })
+
       setMessage('Application withdrawn')
-      setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, applicants: j.applicants.filter((a) => a !== user.uid) } : j)))
+      setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, applicants: j.applicants.filter((a) => a !== user.uid), applied: false, applicationStatus: undefined } : j)))
     } catch (err: any) {
       setMessage(err.message || 'Error withdrawing application')
     }
@@ -184,7 +224,7 @@ export default function BrowseJobs() {
 
                     <div className="flex justify-between items-center">
                       <p className="text-xs text-gray-500">Posted by {job.createdByName}</p>
-                      {user && job.applicants.includes(user.uid) ? (
+                      {user && (job.applied || job.applicants.includes(user.uid)) ? (
                         <div className="flex gap-2">
                           <button
                             onClick={() => withdrawApplication(job.id)}
