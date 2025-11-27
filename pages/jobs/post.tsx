@@ -16,6 +16,7 @@ export default function PostJob() {
   const [tagsInput, setTagsInput] = useState('')
   const [applyLink, setApplyLink] = useState('')
   const [message, setMessage] = useState('')
+  const [errors, setErrors] = useState<{ [k: string]: string }>({})
   const [loading, setLoading] = useState(false)
 
   if (profile?.role !== 'alumni') {
@@ -29,31 +30,58 @@ export default function PostJob() {
     )
   }
 
+  function validate(): boolean {
+    const e: { [k: string]: string } = {}
+    if (!title.trim()) e.title = 'Title is required'
+    if (!description.trim() || description.trim().length < 10) e.description = 'Provide a longer description (min 10 chars)'
+    if (!company.trim()) e.company = 'Company is required'
+    if (applyLink && applyLink.trim()) {
+      try {
+        // eslint-disable-next-line no-new
+        new URL(applyLink)
+      } catch (_) {
+        e.applyLink = 'Invalid URL'
+      }
+    }
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!title || !description || !company) {
-      setMessage('Please fill all required fields')
-      return
-    }
+    setMessage('')
+    if (!validate()) return
 
     setLoading(true)
     try {
-      const tags = tagsInput.split(',').map((t) => t.trim()).filter(Boolean)
-      await addDoc(collection(db, 'jobs'), {
+      const tags = tagsInput
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .map((t) => t)
+
+      const payload = {
         createdBy: user?.uid,
-        title,
-        description,
-        company,
-        location: location || 'Remote',
-        remote,
+        title: title.trim(),
+        description: description.trim(),
+        company: company.trim(),
+        location: location?.trim() || 'Remote',
+        remote: !!remote,
         tags,
-        applyLink: applyLink || '',
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        applicants: [],
+        applyLink: applyLink?.trim() || '',
+      }
+
+      const res = await fetch('/api/jobs/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Server error')
+
       setMessage('Job posted successfully!')
-      setTimeout(() => router.push('/jobs'), 1500)
+      setTimeout(() => router.push('/jobs'), 1200)
     } catch (err: any) {
       setMessage(err.message || 'Error posting job')
     } finally {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../lib/authContext'
 import { db } from '../../lib/firebase'
-import { collection, getDocs, query, where, updateDoc, doc, getDoc } from 'firebase/firestore'
+import { collection, getDocs, query, where, updateDoc, doc, getDoc, arrayUnion, arrayRemove } from 'firebase/firestore'
 import Link from 'next/link'
 
 interface Job {
@@ -69,27 +69,34 @@ export default function BrowseJobs() {
       setMessage('You must be signed in to apply')
       return
     }
+    try {
+      const jobRef = doc(db, 'jobs', jobId)
+      // Atomic add to applicants
+      await updateDoc(jobRef, {
+        applicants: arrayUnion(user.uid),
+      })
+      setMessage('Applied successfully!')
+      setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, applicants: [...j.applicants, user.uid] } : j)))
+    } catch (err: any) {
+      setMessage(err.message || 'Error applying for job')
+    }
+  }
+
+  async function withdrawApplication(jobId: string) {
+    if (!user) {
+      setMessage('You must be signed in')
+      return
+    }
 
     try {
       const jobRef = doc(db, 'jobs', jobId)
-      const jobSnap = await getDoc(jobRef)
-      const job = jobSnap.data() as any
-
-      if (!job.applicants.includes(user.uid)) {
-        await updateDoc(jobRef, {
-          applicants: [...job.applicants, user.uid],
-        })
-        setMessage('Applied successfully!')
-        setJobs((prev) =>
-          prev.map((j) =>
-            j.id === jobId ? { ...j, applicants: [...j.applicants, user.uid] } : j
-          )
-        )
-      } else {
-        setMessage('You already applied for this job')
-      }
+      await updateDoc(jobRef, {
+        applicants: arrayRemove(user.uid),
+      })
+      setMessage('Application withdrawn')
+      setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, applicants: j.applicants.filter((a) => a !== user.uid) } : j)))
     } catch (err: any) {
-      setMessage(err.message || 'Error applying for job')
+      setMessage(err.message || 'Error withdrawing application')
     }
   }
 
@@ -177,17 +184,23 @@ export default function BrowseJobs() {
 
                     <div className="flex justify-between items-center">
                       <p className="text-xs text-gray-500">Posted by {job.createdByName}</p>
-                      <button
-                        onClick={() => applyForJob(job.id)}
-                        disabled={!!(user && job.applicants.includes(user.uid))}
-                        className={`px-4 py-2 rounded font-medium text-sm ${
-                          user && job.applicants.includes(user.uid)
-                            ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                            : 'bg-green-600 text-white hover:bg-green-700'
-                        }`}
-                      >
-                        {user && job.applicants.includes(user.uid) ? '✓ Applied' : 'Apply'}
-                      </button>
+                      {user && job.applicants.includes(user.uid) ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => withdrawApplication(job.id)}
+                            className="px-4 py-2 rounded font-medium text-sm bg-gray-300 text-gray-600"
+                          >
+                            Withdraw
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => applyForJob(job.id)}
+                          className={`px-4 py-2 rounded font-medium text-sm bg-green-600 text-white hover:bg-green-700`}
+                        >
+                          Apply
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

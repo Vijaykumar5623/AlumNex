@@ -50,6 +50,7 @@ export default function CreateEvent() {
         tags,
         maxAttendees: maxAttendees ? parseInt(maxAttendees) : null,
         registrants: [],
+        waitlist: [],
         createdAt: new Date().toISOString(),
       })
       setMessage('Event created successfully!')

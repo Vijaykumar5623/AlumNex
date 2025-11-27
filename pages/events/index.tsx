@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../lib/authContext'
 import { db } from '../../lib/firebase'
-import { collection, getDocs, query, where, updateDoc, doc, getDoc } from 'firebase/firestore'
+import { collection, getDocs, query, where, updateDoc, doc, getDoc, addDoc } from 'firebase/firestore'
 import Link from 'next/link'
 
 interface Event {
@@ -13,6 +13,7 @@ interface Event {
   tags: string[]
   maxAttendees?: number
   registrants: string[]
+  waitlist?: string[]
   createdBy: string
   createdByName?: string
   createdAt: string
@@ -48,6 +49,7 @@ export default function BrowseEvents() {
           tags: data.tags || [],
           maxAttendees: data.maxAttendees,
           registrants: data.registrants || [],
+          waitlist: data.waitlist || [],
           createdBy: data.createdBy,
           createdByName: creatorData?.name || 'Alumni',
           createdAt: data.createdAt,
@@ -70,28 +72,106 @@ export default function BrowseEvents() {
       return
     }
 
+    // If already registered
+    if (event.registrants.includes(user.uid)) {
+      setMessage('You are already registered for this event')
+      return
+    }
+
+    const eventRef = doc(db, 'events', eventId)
+
+    // If event is full, add to waitlist
     if (event.maxAttendees && event.registrants.length >= event.maxAttendees) {
-      setMessage('Event is full')
+      const currentWaitlist = event.waitlist || []
+      if (currentWaitlist.includes(user.uid)) {
+        setMessage('You are already on the waitlist')
+        return
+      }
+
+      try {
+        await updateDoc(eventRef, {
+          waitlist: [...currentWaitlist, user.uid],
+        })
+        setMessage('Event is full — you have been added to the waitlist')
+        setEvents((prev) =>
+          prev.map((e) => (e.id === eventId ? { ...e, waitlist: [...(e.waitlist || []), user.uid] } : e))
+        )
+      } catch (err: any) {
+        setMessage(err.message || 'Error joining waitlist')
+      }
+
       return
     }
 
     try {
-      const eventRef = doc(db, 'events', eventId)
-      if (!event.registrants.includes(user.uid)) {
-        await updateDoc(eventRef, {
-          registrants: [...event.registrants, user.uid],
-        })
-        setMessage('Registered successfully!')
-        setEvents((prev) =>
-          prev.map((e) =>
-            e.id === eventId ? { ...e, registrants: [...e.registrants, user.uid] } : e
-          )
-        )
-      } else {
-        setMessage('You are already registered for this event')
-      }
+      await updateDoc(eventRef, {
+        registrants: [...event.registrants, user.uid],
+      })
+      setMessage('Registered successfully!')
+      setEvents((prev) => prev.map((e) => (e.id === eventId ? { ...e, registrants: [...e.registrants, user.uid] } : e)))
     } catch (err: any) {
       setMessage(err.message || 'Error registering for event')
+    }
+  }
+
+  async function unregisterFromEvent(eventId: string, event: Event) {
+    if (!user) {
+      setMessage('You must be signed in')
+      return
+    }
+
+    const eventRef = doc(db, 'events', eventId)
+
+    try {
+      // If user is on registrants, remove them and promote next from waitlist
+      if (event.registrants.includes(user.uid)) {
+        const newRegistrants = event.registrants.filter((uid) => uid !== user.uid)
+        let newWaitlist = event.waitlist ? [...event.waitlist] : []
+        let promoted: string | null = null
+
+        if (newWaitlist.length > 0) {
+          promoted = newWaitlist.shift() as string
+          newRegistrants.push(promoted)
+        }
+
+        await updateDoc(eventRef, {
+          registrants: newRegistrants,
+          waitlist: newWaitlist,
+        })
+
+        setEvents((prev) =>
+          prev.map((e) =>
+            e.id === eventId ? { ...e, registrants: newRegistrants, waitlist: newWaitlist } : e
+          )
+        )
+
+        setMessage('Registration cancelled')
+
+        // Notify promoted user if any
+        if (promoted) {
+          try {
+            await addDoc(collection(db, 'notifications'), {
+              userId: promoted,
+              type: 'event_promoted',
+              message: `You have been moved off the waitlist and registered for ${event.title}`,
+              createdAt: new Date().toISOString(),
+              read: false,
+            })
+          } catch (nerr) {
+            console.warn('Failed to notify promoted user:', nerr)
+          }
+        }
+      } else if (event.waitlist && event.waitlist.includes(user.uid)) {
+        // If user is on waitlist, remove them
+        const newWaitlist = event.waitlist.filter((uid) => uid !== user.uid)
+        await updateDoc(eventRef, { waitlist: newWaitlist })
+        setEvents((prev) => prev.map((e) => (e.id === eventId ? { ...e, waitlist: newWaitlist } : e)))
+        setMessage('Removed from waitlist')
+      } else {
+        setMessage('You are not registered for this event')
+      }
+    } catch (err: any) {
+      setMessage(err.message || 'Error updating registration')
     }
   }
 
@@ -188,21 +268,39 @@ export default function BrowseEvents() {
 
                       <div className="flex justify-between items-center">
                         <p className="text-xs text-gray-500">Hosted by {event.createdByName}</p>
-                        <button
-                          onClick={() => registerForEvent(event.id, event)}
-                          disabled={!!((user && event.registrants.includes(user.uid)) || isPast || isFull)}
-                          className={`px-4 py-2 rounded font-medium text-sm ${
-                            isPast
-                              ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                              : isFull
-                              ? 'bg-red-300 text-red-600 cursor-not-allowed'
-                              : user && event.registrants.includes(user.uid)
-                              ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                              : 'bg-purple-600 text-white hover:bg-purple-700'
-                          }`}
-                        >
-                          {isPast ? 'Event Ended' : isFull ? 'Full' : user && event.registrants.includes(user.uid) ? '✓ Registered' : 'Register'}
-                        </button>
+                        {isPast ? (
+                          <button className="px-4 py-2 rounded font-medium text-sm bg-gray-300 text-gray-600 cursor-not-allowed">Event Ended</button>
+                        ) : user && event.registrants.includes(user.uid) ? (
+                          <button
+                            onClick={() => unregisterFromEvent(event.id, event)}
+                            className="px-4 py-2 rounded font-medium text-sm bg-gray-300 text-gray-600"
+                          >
+                            Cancel Registration
+                          </button>
+                        ) : isFull ? (
+                          event.waitlist && event.waitlist.includes(user?.uid || '') ? (
+                            <button
+                              onClick={() => unregisterFromEvent(event.id, event)}
+                              className="px-4 py-2 rounded font-medium text-sm bg-yellow-100 text-yellow-800"
+                            >
+                              Leave Waitlist
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => registerForEvent(event.id, event)}
+                              className="px-4 py-2 rounded font-medium text-sm bg-yellow-600 text-white hover:bg-yellow-700"
+                            >
+                              Join Waitlist
+                            </button>
+                          )
+                        ) : (
+                          <button
+                            onClick={() => registerForEvent(event.id, event)}
+                            className="px-4 py-2 rounded font-medium text-sm bg-purple-600 text-white hover:bg-purple-700"
+                          >
+                            Register
+                          </button>
+                        )}
                       </div>
                     </div>
                   )
