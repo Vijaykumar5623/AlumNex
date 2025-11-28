@@ -20,8 +20,9 @@ service cloud.firestore {
     }
 
     // Profiles: each user can read/write their own profile, admins can read all
+    // Public read allowed so the search API (running unauthenticated) can find mentors
     match /profiles/{uid} {
-      allow read: if request.auth.uid == uid || isAdmin();
+      allow read: if true;
       allow create: if request.auth.uid == uid;
       allow update: if request.auth.uid == uid || isAdmin();
       allow delete: if false;

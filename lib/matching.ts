@@ -22,11 +22,15 @@ export async function findTopMentors(studentSkills: string[], topN = 5): Promise
 
   for (const doc of snap.docs) {
     const data = doc.data() as any
-    const alumniSkills: string[] = Array.isArray(data.skills) ? data.skills.map((s: any) => String(s).toLowerCase()) : []
-    const normalizedStudent = studentSkills.map((s) => String(s).toLowerCase())
-    const common = alumniSkills.filter((s) => normalizedStudent.includes(s))
+    const alumniSkills: string[] = Array.isArray(data.skills) ? data.skills.map((s: any) => String(s).toLowerCase().trim()) : []
+    const normalizedStudent = studentSkills.map((s) => String(s).toLowerCase().trim())
 
-    const score = common.length // simple score = number of overlapping skills
+    // Improved matching: check for partial matches
+    const common = alumniSkills.filter((aS) =>
+      normalizedStudent.some(sS => aS.includes(sS) || sS.includes(aS))
+    )
+
+    const score = common.length
 
     candidates.push({
       uid: doc.id,

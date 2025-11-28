@@ -41,6 +41,16 @@ export default function EditProfile() {
     }
   }, [user])
 
+  // Populate form with existing profile data
+  useEffect(() => {
+    if (profile) {
+      setName(profile.name || '')
+      setBio(profile.bio || '')
+      setCompany(profile.company || '')
+      setSkills(profile.skills ? profile.skills.join(', ') : '')
+    }
+  }, [profile])
+
   async function loadDocuments() {
     try {
       const q = query(
@@ -264,8 +274,8 @@ export default function EditProfile() {
                           doc.status === 'approved'
                             ? 'text-green-600'
                             : doc.status === 'rejected'
-                            ? 'text-red-600'
-                            : 'text-yellow-600'
+                              ? 'text-red-600'
+                              : 'text-yellow-600'
                         }
                       >
                         {doc.status}

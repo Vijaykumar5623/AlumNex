@@ -106,7 +106,9 @@
   "participants": ["string array with 2 UIDs"],
   "createdAt": "ISO timestamp",
   "lastMessageAt": "ISO timestamp",
-  "lastMessage": "string (preview)"
+  "lastMessage": "string (preview)",
+  "lastMessageBy": "string (UID)",
+  "unreadCount": { "uid1": 0, "uid2": 1 }
 }
 
 // ============================================

@@ -9,6 +9,10 @@ interface UserProfile {
   role: 'student' | 'alumni' | 'admin'
   createdAt: string
   verified?: boolean
+  name?: string
+  bio?: string
+  company?: string
+  skills?: string[]
 }
 
 interface AuthContextType {

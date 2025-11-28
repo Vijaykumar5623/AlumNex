@@ -96,15 +96,22 @@ export default function MentorshipIndex() {
           {matches.map((m) => (
             <div key={m.uid} className="bg-white p-4 rounded shadow flex justify-between items-center">
               <div>
-                <div className="font-medium">{m.name || m.email}</div>
+                <Link href={`/profile/${m.uid}`} className="font-medium hover:text-blue-600 hover:underline text-lg">
+                  {m.name || m.email}
+                </Link>
                 <div className="text-xs text-gray-600">Common: {m.commonSkills.join(', ') || '—'}</div>
                 <div className="text-xs text-gray-500">Skills: {m.skills.join(', ')}</div>
               </div>
               <div className="flex flex-col items-end gap-2">
                 <div className="text-sm font-semibold">Score: {m.score}</div>
-                <button onClick={() => sendRequest(m.uid)} disabled={loading || !user || profile?.role !== 'student'} className="px-3 py-1 bg-green-600 text-white rounded text-sm">
-                  {profile?.role === 'student' ? 'Request Mentor' : 'Sign in as student'}
-                </button>
+                <div className="flex gap-2">
+                  <Link href={`/profile/${m.uid}`} className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">
+                    View Profile
+                  </Link>
+                  <button onClick={() => sendRequest(m.uid)} disabled={loading || !user || profile?.role !== 'student'} className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:opacity-50">
+                    {profile?.role === 'student' ? 'Request Mentor' : 'Sign in'}
+                  </button>
+                </div>
               </div>
             </div>
           ))}

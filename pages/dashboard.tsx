@@ -67,7 +67,9 @@ export default function Dashboard() {
             <h2 className="text-lg font-semibold mb-2">Your Profile</h2>
             <p className="text-sm text-gray-600 mb-2">Email: {profile.email}</p>
             <p className="text-sm text-gray-600 mb-2">Role: <span className="font-medium capitalize">{profile.role}</span></p>
-            <p className="text-sm text-gray-600 mb-4">Status: {profile.verified ? <span className="text-green-600">✓ Verified</span> : <span className="text-yellow-600">Pending</span>}</p>
+            {profile.role === 'alumni' && (
+              <p className="text-sm text-gray-600 mb-4">Status: {profile.verified ? <span className="text-green-600">✓ Verified</span> : <span className="text-yellow-600">Pending</span>}</p>
+            )}
             {profile.role === 'alumni' && !profile.verified && (
               <Link href="/profile/edit" className="text-blue-600 hover:underline text-sm">
                 Complete profile & upload documents →
@@ -100,6 +102,9 @@ export default function Dashboard() {
                   <Link href="/mentorship" className="block text-blue-600 hover:underline text-sm">
                     Find a Mentor
                   </Link>
+                  <Link href="/chat" className="block text-blue-600 hover:underline text-sm">
+                    Messages
+                  </Link>
                 </>
               )}
               {profile.role === 'alumni' && (
@@ -112,6 +117,9 @@ export default function Dashboard() {
                   </Link>
                   <Link href="/mentorship/offers" className="block text-blue-600 hover:underline text-sm">
                     View Mentorship Requests
+                  </Link>
+                  <Link href="/chat" className="block text-blue-600 hover:underline text-sm">
+                    Messages
                   </Link>
                 </>
               )}

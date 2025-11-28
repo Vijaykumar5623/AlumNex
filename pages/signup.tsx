@@ -14,7 +14,7 @@ export default function Signup() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
-    
+
     if (password !== confirmPassword) {
       setMessage('Passwords do not match')
       return
@@ -22,7 +22,7 @@ export default function Signup() {
 
     setLoading(true)
     setMessage('Creating account...')
-    
+
     try {
       // Create Firebase Auth user
       const userCred = await createUserWithEmailAndPassword(auth, email, password)
@@ -34,7 +34,7 @@ export default function Signup() {
         email,
         role,
         createdAt: new Date().toISOString(),
-        verified: role === 'admin', // admins are auto-verified
+        verified: role === 'admin' || role === 'student', // admins and students are auto-verified
       })
 
       setMessage('Account created! Redirecting to dashboard...')
@@ -44,7 +44,7 @@ export default function Signup() {
     } catch (err: any) {
       console.error('Signup error:', err)
       let errorMsg = err.message || 'Error creating account'
-      
+
       // Provide user-friendly error messages
       if (err.code === 'auth/email-already-in-use') {
         errorMsg = 'This email is already registered'
@@ -53,7 +53,7 @@ export default function Signup() {
       } else if (err.code === 'auth/invalid-email') {
         errorMsg = 'Invalid email address'
       }
-      
+
       setMessage(errorMsg)
       setLoading(false)
     }
