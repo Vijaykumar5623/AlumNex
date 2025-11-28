@@ -115,8 +115,8 @@ export function useConversations(userId: string | null) {
 
         const q = query(
             collection(db, 'conversations'),
-            where('participants', 'array-contains', userId),
-            orderBy('lastMessageAt', 'desc')
+            where('participants', 'array-contains', userId)
+            // orderBy('lastMessageAt', 'desc') // Removed to avoid needing a composite index
         )
 
         const unsubscribe = onSnapshot(q, async (snapshot) => {
@@ -124,6 +124,13 @@ export function useConversations(userId: string | null) {
                 id: doc.id,
                 ...doc.data()
             })) as Conversation[]
+
+            // Sort client-side
+            convs.sort((a, b) => {
+                const tA = a.lastMessageAt?.toMillis ? a.lastMessageAt.toMillis() : 0
+                const tB = b.lastMessageAt?.toMillis ? b.lastMessageAt.toMillis() : 0
+                return tB - tA
+            })
 
             // Fetch other user profiles for UI
             // In a real app, you might cache this or store basic profile info in the conversation doc
@@ -143,6 +150,9 @@ export function useConversations(userId: string | null) {
             }))
 
             setConversations(enrichedConvs)
+            setLoading(false)
+        }, (error) => {
+            console.error("Error fetching conversations:", error)
             setLoading(false)
         })
 
