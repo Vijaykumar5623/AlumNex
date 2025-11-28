@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { signOut } from 'firebase/auth'
-import { auth } from '../lib/firebase'
+import { collection, query, where, getDocs } from 'firebase/firestore'
+import { auth, db } from '../lib/firebase'
 import { useAuth } from '../lib/authContext'
 import Link from 'next/link'
 
@@ -9,6 +10,7 @@ export default function Dashboard() {
   const { user, profile, loading } = useAuth()
   const router = useRouter()
   const [signingOut, setSigningOut] = useState(false)
+  const [counts, setCounts] = useState({ verifications: 0, requests: 0, offers: 0 })
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -16,6 +18,42 @@ export default function Dashboard() {
       router.push('/login')
     }
   }, [user, loading, router])
+
+  // Fetch notification counts
+  useEffect(() => {
+    if (!user || !profile) return
+
+    async function fetchCounts() {
+      try {
+        const newCounts = { verifications: 0, requests: 0, offers: 0 }
+
+        if (profile?.role === 'admin') {
+          // Count pending verifications
+          const qVer = query(collection(db, 'profiles'), where('role', '==', 'alumni'), where('verified', '==', false))
+          const snapVer = await getDocs(qVer)
+          newCounts.verifications = snapVer.size
+
+          // Count pending mentorship requests (admin view)
+          const qReq = query(collection(db, 'mentorship_requests'), where('status', '==', 'pending'))
+          const snapReq = await getDocs(qReq)
+          newCounts.requests = snapReq.size
+        }
+
+        if (profile?.role === 'alumni' && user) {
+          // Count pending mentorship offers
+          const qOff = query(collection(db, 'mentorship_requests'), where('mentorUid', '==', user.uid), where('status', '==', 'pending'))
+          const snapOff = await getDocs(qOff)
+          newCounts.offers = snapOff.size
+        }
+
+        setCounts(newCounts)
+      } catch (err) {
+        console.error('Error fetching counts:', err)
+      }
+    }
+
+    fetchCounts()
+  }, [user, profile])
 
   async function handleSignOut() {
     setSigningOut(true)
@@ -115,8 +153,9 @@ export default function Dashboard() {
                   <Link href="/events/create" className="block text-blue-600 hover:underline text-sm">
                     Create an Event
                   </Link>
-                  <Link href="/mentorship/offers" className="block text-blue-600 hover:underline text-sm">
-                    View Mentorship Requests
+                  <Link href="/mentorship/offers" className="block text-blue-600 hover:underline text-sm flex justify-between">
+                    <span>View Mentorship Requests</span>
+                    {counts.offers > 0 && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{counts.offers}</span>}
                   </Link>
                   <Link href="/chat" className="block text-blue-600 hover:underline text-sm">
                     Messages
@@ -128,11 +167,13 @@ export default function Dashboard() {
                   <Link href="/admin/documents" className="block text-blue-600 hover:underline text-sm">
                     Review Documents
                   </Link>
-                  <Link href="/admin/pending-verifications" className="block text-blue-600 hover:underline text-sm">
-                    Pending Verifications
+                  <Link href="/admin/pending-verifications" className="block text-blue-600 hover:underline text-sm flex justify-between">
+                    <span>Pending Verifications</span>
+                    {counts.verifications > 0 && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{counts.verifications}</span>}
                   </Link>
-                  <Link href="/admin/mentorship-requests" className="block text-blue-600 hover:underline text-sm">
-                    Mentorship Requests
+                  <Link href="/admin/mentorship-requests" className="block text-blue-600 hover:underline text-sm flex justify-between">
+                    <span>Mentorship Requests</span>
+                    {counts.requests > 0 && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{counts.requests}</span>}
                   </Link>
                   <Link href="/admin/analytics" className="block text-blue-600 hover:underline text-sm">
                     View Analytics

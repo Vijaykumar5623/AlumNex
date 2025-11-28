@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../../lib/authContext'
+import { db } from '../../lib/firebase'
+import { collection, addDoc } from 'firebase/firestore'
 import Link from 'next/link'
 
 interface Mentor {
@@ -46,19 +48,17 @@ export default function MentorshipIndex() {
     if (!user) return setMessage('You must be signed in as a student to send requests')
     setLoading(true)
     try {
-      const res = await fetch('/api/mentorship/request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentUid: user.uid, mentorUid, message: '' }),
+      await addDoc(collection(db, 'mentorship_requests'), {
+        studentUid: user.uid,
+        mentorUid,
+        message: '',
+        status: 'pending',
+        requestedAt: new Date().toISOString(),
       })
-      const data = await res.json()
-      if (res.ok) {
-        setMessage('Request sent!')
-      } else {
-        setMessage(data.error || 'Error sending request')
-      }
+      setMessage('Request sent successfully!')
     } catch (err: any) {
-      setMessage(err.message || 'Network error')
+      console.error('Request error:', err)
+      setMessage('Error sending request: ' + err.message)
     } finally {
       setLoading(false)
     }
