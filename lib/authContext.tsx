@@ -13,6 +13,8 @@ interface UserProfile {
   bio?: string
   company?: string
   skills?: string[]
+  karma?: number
+  badges?: string[]
 }
 
 interface AuthContextType {

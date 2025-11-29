@@ -123,6 +123,23 @@ export default function Dashboard() {
                 Review documents →
               </Link>
             )}
+
+            {/* Gamification Stats */}
+            <div className="mt-6 pt-4 border-t">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium text-gray-700">Karma Points</span>
+                <span className="text-lg font-bold text-yellow-600">{profile.karma || 0} 🌟</span>
+              </div>
+              {profile.badges && profile.badges.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {profile.badges.map(badge => (
+                    <span key={badge} className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full border border-yellow-200">
+                      {badge}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Quick actions */}
@@ -140,6 +157,12 @@ export default function Dashboard() {
                   <Link href="/mentorship" className="block text-blue-600 hover:underline text-sm">
                     Find a Mentor
                   </Link>
+                  <Link href="/stories" className="block text-blue-600 hover:underline text-sm">
+                    Success Stories
+                  </Link>
+                  <Link href="/community" className="block text-blue-600 hover:underline text-sm">
+                    Community Forums
+                  </Link>
                   <Link href="/chat" className="block text-blue-600 hover:underline text-sm">
                     Messages
                   </Link>
@@ -156,6 +179,12 @@ export default function Dashboard() {
                   <Link href="/mentorship/offers" className="block text-blue-600 hover:underline text-sm flex justify-between">
                     <span>View Mentorship Requests</span>
                     {counts.offers > 0 && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{counts.offers}</span>}
+                  </Link>
+                  <Link href="/stories" className="block text-blue-600 hover:underline text-sm">
+                    Success Stories
+                  </Link>
+                  <Link href="/community" className="block text-blue-600 hover:underline text-sm">
+                    Community Forums
                   </Link>
                   <Link href="/chat" className="block text-blue-600 hover:underline text-sm">
                     Messages
@@ -177,6 +206,12 @@ export default function Dashboard() {
                   </Link>
                   <Link href="/admin/analytics" className="block text-blue-600 hover:underline text-sm">
                     View Analytics
+                  </Link>
+                  <Link href="/admin/stories/create" className="block text-blue-600 hover:underline text-sm">
+                    Publish Success Story
+                  </Link>
+                  <Link href="/community" className="block text-blue-600 hover:underline text-sm">
+                    Moderate Forums
                   </Link>
                 </>
               )}

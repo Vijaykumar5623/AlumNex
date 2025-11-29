@@ -8,12 +8,21 @@ export interface MentorCandidate {
   skills: string[]
   score: number
   commonSkills: string[]
+  company?: string
+  location?: string
+  jobTitle?: string
+}
+
+export interface MatchFilters {
+  location?: string
+  company?: string
+  name?: string
 }
 
 /**
  * Simple rule-based matcher: counts overlapping skills and returns top N alumni
  */
-export async function findTopMentors(studentSkills: string[], topN = 5): Promise<MentorCandidate[]> {
+export async function findTopMentors(studentSkills: string[], filters: MatchFilters = {}, topN = 5): Promise<MentorCandidate[]> {
   const candidates: MentorCandidate[] = []
 
   // Query verified alumni
@@ -22,6 +31,12 @@ export async function findTopMentors(studentSkills: string[], topN = 5): Promise
 
   for (const doc of snap.docs) {
     const data = doc.data() as any
+
+    // Apply Filters
+    if (filters.location && !data.location?.toLowerCase().includes(filters.location.toLowerCase())) continue
+    if (filters.company && !data.company?.toLowerCase().includes(filters.company.toLowerCase())) continue
+    if (filters.name && !data.name?.toLowerCase().includes(filters.name.toLowerCase())) continue
+
     const alumniSkills: string[] = Array.isArray(data.skills) ? data.skills.map((s: any) => String(s).toLowerCase().trim()) : []
     const normalizedStudent = studentSkills.map((s) => String(s).toLowerCase().trim())
 
@@ -30,7 +45,22 @@ export async function findTopMentors(studentSkills: string[], topN = 5): Promise
       normalizedStudent.some(sS => aS.includes(sS) || sS.includes(aS))
     )
 
-    const score = common.length
+    // Weighted Scoring System
+    // Base score from skills (5 points each)
+    let score = common.length * 5
+
+    // Location bonus (10 points)
+    if (filters.location && data.location?.toLowerCase().includes(filters.location.toLowerCase())) {
+      score += 10
+    }
+
+    // Company bonus (10 points)
+    if (filters.company && data.company?.toLowerCase().includes(filters.company.toLowerCase())) {
+      score += 10
+    }
+
+    // If skills are provided, only show those with score > 0. If no skills provided, show all (filtered by other criteria)
+    if (studentSkills.length > 0 && common.length === 0 && score === 0) continue
 
     candidates.push({
       uid: doc.id,
@@ -39,6 +69,9 @@ export async function findTopMentors(studentSkills: string[], topN = 5): Promise
       skills: alumniSkills,
       score,
       commonSkills: common,
+      company: data.company,
+      location: data.location,
+      jobTitle: data.jobTitle
     })
   }
 
